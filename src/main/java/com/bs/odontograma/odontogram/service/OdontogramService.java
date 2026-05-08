@@ -63,6 +63,22 @@ public class OdontogramService {
     private final OdontogramMapper mapper;
     private final TenantContext tenantContext;
 
+    /**
+     * Get-or-create the current odontogram for a patient. Idempotent: if a current
+     * odontogram already exists for the patient, returns it without modifications.
+     * Use this from the frontend's first-render flow so opening the chart never
+     * accidentally archives the patient's existing data.
+     */
+    public OdontogramResponse getOrCreateCurrent(CreateOdontogramRequest request) {
+        UUID tenantId = tenantContext.getCurrentTenantId();
+        Patient patient = patientRepository.findByIdAndTenantId(request.getPatientId(), tenantId)
+                .orElseThrow(() -> new EntityNotFoundException("Patient", request.getPatientId()));
+
+        return repository.findByTenantIdAndPatientIdAndCurrentTrue(tenantId, patient.getId())
+                .map(mapper::toResponse)
+                .orElseGet(() -> create(request));
+    }
+
     public OdontogramResponse create(CreateOdontogramRequest request) {
         UUID tenantId = tenantContext.getCurrentTenantId();
 

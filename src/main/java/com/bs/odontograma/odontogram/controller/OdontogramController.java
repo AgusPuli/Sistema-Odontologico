@@ -37,6 +37,19 @@ public class OdontogramController {
                 .body(ApiResponse.success(service.create(request), "Odontogram created"));
     }
 
+    @PostMapping("/get-or-create-current")
+    @PreAuthorize("hasAnyRole('SUPERADMIN','ADMIN','MANAGER')")
+    @Operation(
+            summary = "Get-or-create current odontogram (idempotent)",
+            description = "Returns the current odontogram if it exists, otherwise creates one. " +
+                    "Safe to call on chart load without accidentally archiving the patient's data."
+    )
+    public ResponseEntity<ApiResponse<OdontogramResponse>> getOrCreateCurrent(
+            @Valid @RequestBody CreateOdontogramRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(service.getOrCreateCurrent(request)));
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('SUPERADMIN','ADMIN','MANAGER')")
     @Operation(summary = "Get odontogram by ID")

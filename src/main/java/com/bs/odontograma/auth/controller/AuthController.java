@@ -109,4 +109,38 @@ public class AuthController {
                 ApiResponse.success(null, "Password updated successfully")
         );
     }
+
+    /**
+     * Returns the authenticated user. Lets the frontend refresh user data without
+     * relying solely on the JWT claims (e.g. after the user updates their profile).
+     */
+    @GetMapping("/me")
+    @Operation(summary = "Current user", description = "Returns the authenticated user data")
+    public ResponseEntity<ApiResponse<com.bs.odontograma.auth.dto.UserResponse>> me() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
+        return ResponseEntity.ok(
+                ApiResponse.success(authService.findCurrentUser(userPrincipal.getId()))
+        );
+    }
+
+    /**
+     * Bootstrap endpoint: creates the very first tenant + SUPERADMIN of the system.
+     *
+     * Open to the public (no auth required) but only succeeds when the database has
+     * zero tenants. After the first call this endpoint becomes a no-op (returns 409).
+     * Use this once to onboard a new installation, then disable in production.
+     */
+    @PostMapping("/bootstrap")
+    @Operation(
+            summary = "Bootstrap installation",
+            description = "Creates the first tenant and SUPERADMIN user. Only works on a fresh installation."
+    )
+    public ResponseEntity<ApiResponse<com.bs.odontograma.auth.dto.AuthResponse>> bootstrap(
+            @Valid @RequestBody com.bs.odontograma.auth.dto.BootstrapRequest request
+    ) {
+        com.bs.odontograma.auth.dto.AuthResponse response = authService.bootstrap(request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(response, "Installation bootstrapped"));
+    }
 }

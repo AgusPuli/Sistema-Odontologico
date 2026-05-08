@@ -1,13 +1,18 @@
 package com.bs.odontograma.auth.service;
 
 import com.bs.odontograma.auth.dto.AuthResponse;
+import com.bs.odontograma.auth.dto.BootstrapRequest;
 import com.bs.odontograma.auth.dto.UserResponse;
 import com.bs.odontograma.auth.entity.User;
 import com.bs.odontograma.auth.entity.UserRole;
 import com.bs.odontograma.auth.mapper.UserMapper;
 import com.bs.odontograma.auth.repository.UserRepository;
 import com.bs.odontograma.shared.exception.BusinessRuleViolationException;
+import com.bs.odontograma.shared.exception.EntityNotFoundException;
 import com.bs.odontograma.shared.security.jwt.JwtTokenProvider;
+import com.bs.odontograma.tenant.entity.SubscriptionPlan;
+import com.bs.odontograma.tenant.entity.Tenant;
+import com.bs.odontograma.tenant.repository.TenantRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -15,6 +20,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Service
@@ -24,6 +30,7 @@ import java.util.UUID;
 public class AuthService {
 
     private final UserRepository userRepository;
+    private final TenantRepository tenantRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider tokenProvider;
     private final UserMapper userMapper;
@@ -130,6 +137,69 @@ public class AuthService {
                 .tokenType("Bearer")
                 .expiresIn(86400000L)
                 .user(userMapper.toResponse(user))
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public UserResponse findCurrentUser(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("User", userId));
+        return userMapper.toResponse(user);
+    }
+
+    /**
+     * Creates the first tenant + SUPERADMIN of the installation. Idempotency guard:
+     * fails with 409 if any tenant already exists, so this endpoint is safe to leave
+     * exposed but useless after the first successful call.
+     */
+    public AuthResponse bootstrap(BootstrapRequest request) {
+        long existing = tenantRepository.count();
+        if (existing > 0) {
+            throw new BusinessRuleViolationException(
+                    "System already initialized — bootstrap endpoint is disabled"
+            );
+        }
+
+        log.info("Bootstrapping installation with admin {} and clinic '{}'",
+                request.getAdminEmail(), request.getClinicName());
+
+        // Create tenant on the SUPER plan so user limits don't get in the way
+        Tenant tenant = Tenant.builder()
+                .name(request.getClinicName())
+                .email(request.getAdminEmail())
+                .subscriptionPlan(SubscriptionPlan.SUPER)
+                .maxUsers(SubscriptionPlan.SUPER.getMaxUsers())
+                .active(true)
+                .planExpiration(LocalDateTime.now().plusYears(10))
+                .build();
+        tenant = tenantRepository.save(tenant);
+
+        // Create the SUPERADMIN user owned by that tenant
+        User admin = User.builder()
+                .email(request.getAdminEmail().toLowerCase().trim())
+                .passwordHash(passwordEncoder.encode(request.getAdminPassword()))
+                .firstName(request.getAdminFirstName().trim())
+                .lastName(request.getAdminLastName())
+                .role(UserRole.SUPERADMIN)
+                .active(true)
+                .build();
+        admin.setTenantId(tenant.getId());
+        admin = userRepository.save(admin);
+
+        log.info("Bootstrap done. Tenant {}, user {}", tenant.getId(), admin.getId());
+
+        // Issue tokens immediately so the front can navigate straight to the dashboard
+        String accessToken = tokenProvider.generateAccessToken(
+                admin.getId(), admin.getTenantId(), admin.getEmail(), admin.getRole()
+        );
+        String refreshToken = tokenProvider.generateRefreshToken(admin.getId());
+
+        return AuthResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .tokenType("Bearer")
+                .expiresIn(86400000L)
+                .user(userMapper.toResponse(admin))
                 .build();
     }
 

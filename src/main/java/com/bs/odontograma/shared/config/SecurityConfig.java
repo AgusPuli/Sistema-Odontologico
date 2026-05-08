@@ -41,13 +41,21 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .authorizeHttpRequests(auth -> auth
-                        // Public endpoints
+                        // Public auth endpoints (login, refresh, bootstrap installation).
+                        // /auth/me, /auth/logout, /auth/register and /auth/change-password
+                        // intentionally fall through to authenticated().
                         .requestMatchers(
-                                "/api/auth/**",
+                                "/api/auth/login",
+                                "/api/auth/refresh",
+                                "/api/auth/bootstrap"
+                        ).permitAll()
+                        // Public infrastructure endpoints
+                        .requestMatchers(
                                 "/api/health/**",
                                 "/swagger-ui/**",
                                 "/api-docs/**",
-                                "/swagger-ui.html"
+                                "/swagger-ui.html",
+                                "/actuator/health/**"
                         ).permitAll()
                         // All other requests require authentication
                         .anyRequest().authenticated()

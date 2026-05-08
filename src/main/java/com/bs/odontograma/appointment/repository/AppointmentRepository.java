@@ -32,4 +32,12 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
     );
 
     Page<Appointment> findByTenantIdAndStatus(UUID tenantId, AppointmentStatus status, Pageable pageable);
+
+    long countByTenantIdAndAppointmentDate(UUID tenantId, LocalDate date);
+
+    long countByTenantIdAndAppointmentDateBetween(UUID tenantId, LocalDate from, LocalDate to);
+
+    long countByTenantIdAndAppointmentDateGreaterThanEqualAndStatusIn(
+            UUID tenantId, LocalDate from, java.util.Collection<AppointmentStatus> statuses
+    );
 }

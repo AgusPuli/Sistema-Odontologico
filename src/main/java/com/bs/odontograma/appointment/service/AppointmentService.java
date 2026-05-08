@@ -133,4 +133,11 @@ public class AppointmentService {
         a.reschedule(request.getAppointmentDate(), request.getAppointmentTime());
         return mapper.toResponse(repository.save(a));
     }
+
+    public void delete(UUID id) {
+        UUID tenantId = tenantContext.getCurrentTenantId();
+        Appointment a = repository.findByIdAndTenantId(id, tenantId)
+                .orElseThrow(() -> new EntityNotFoundException("Appointment", id));
+        repository.delete(a);
+    }
 }

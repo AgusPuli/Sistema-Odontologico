@@ -20,6 +20,10 @@ public interface PatientRepository extends JpaRepository<Patient, UUID> {
 
     boolean existsByTenantIdAndDocumentNumber(UUID tenantId, String documentNumber);
 
+    long countByTenantId(UUID tenantId);
+
+    long countByTenantIdAndActiveTrue(UUID tenantId);
+
     @Query("""
             SELECT p FROM Patient p
             WHERE p.tenantId = :tenantId

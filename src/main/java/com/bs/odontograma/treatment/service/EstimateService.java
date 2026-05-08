@@ -102,4 +102,61 @@ public class EstimateService {
         e.setStatus(newStatus);
         return mapper.toResponse(repository.save(e));
     }
+
+    /**
+     * Replaces the items of an existing estimate. Items are mutated in place
+     * (clear + repopulate via cascade orphanRemoval) so the parent ID is preserved.
+     * Status is reset to DRAFT to avoid sneaky changes on already-accepted estimates.
+     */
+    public EstimateResponse update(UUID id, CreateEstimateRequest request) {
+        UUID tenantId = tenantContext.getCurrentTenantId();
+        Estimate estimate = repository.findByIdAndTenantId(id, tenantId)
+                .orElseThrow(() -> new EntityNotFoundException("Estimate", id));
+
+        if (estimate.getStatus() == EstimateStatus.ACCEPTED ||
+            estimate.getStatus() == EstimateStatus.CANCELLED) {
+            throw new com.bs.odontograma.shared.exception.BusinessRuleViolationException(
+                    "Cannot modify an estimate that is " + estimate.getStatus()
+            );
+        }
+
+        estimate.setValidUntil(request.getValidUntil());
+        estimate.setNotes(request.getNotes());
+        estimate.getItems().clear();
+
+        for (com.bs.odontograma.treatment.dto.request.EstimateItemRequest itemReq : request.getItems()) {
+            com.bs.odontograma.treatment.entity.Treatment t = treatmentRepository
+                    .findByIdAndTenantId(itemReq.getTreatmentId(), tenantId)
+                    .orElseThrow(() -> new EntityNotFoundException("Treatment", itemReq.getTreatmentId()));
+            BigDecimal price = itemReq.getUnitPrice() != null
+                    ? itemReq.getUnitPrice()
+                    : (t.getDefaultPrice() != null ? t.getDefaultPrice() : BigDecimal.ZERO);
+            int qty = itemReq.getQuantity() != null ? itemReq.getQuantity() : 1;
+
+            com.bs.odontograma.treatment.entity.EstimateItem item =
+                    com.bs.odontograma.treatment.entity.EstimateItem.builder()
+                            .estimate(estimate)
+                            .treatment(t)
+                            .fdiNumber(itemReq.getFdiNumber())
+                            .quantity(qty)
+                            .unitPrice(price)
+                            .build();
+            item.recomputeSubtotal();
+            estimate.getItems().add(item);
+        }
+        estimate.recomputeTotal();
+        return mapper.toResponse(repository.save(estimate));
+    }
+
+    public void delete(UUID id) {
+        UUID tenantId = tenantContext.getCurrentTenantId();
+        Estimate e = repository.findByIdAndTenantId(id, tenantId)
+                .orElseThrow(() -> new EntityNotFoundException("Estimate", id));
+        if (e.getStatus() == EstimateStatus.ACCEPTED) {
+            throw new com.bs.odontograma.shared.exception.BusinessRuleViolationException(
+                    "Cannot delete an accepted estimate. Cancel it instead."
+            );
+        }
+        repository.delete(e);
+    }
 }

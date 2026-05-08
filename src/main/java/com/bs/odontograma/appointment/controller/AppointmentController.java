@@ -115,4 +115,12 @@ public class AppointmentController {
         return ResponseEntity.ok(ApiResponse.success(
                 service.reschedule(id, request), "Appointment rescheduled"));
     }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('SUPERADMIN','ADMIN','MANAGER')")
+    @Operation(summary = "Delete appointment")
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
+        service.delete(id);
+        return ResponseEntity.ok(ApiResponse.success(null, "Appointment deleted"));
+    }
 }

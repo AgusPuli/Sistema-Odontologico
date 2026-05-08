@@ -30,4 +30,7 @@ public interface ToothHistoryEntryRepository extends JpaRepository<ToothHistoryE
             @Param("odontogramId") UUID odontogramId,
             @Param("status") TreatmentStatus status
     );
+
+    /** Count pending/in-progress treatment items across all teeth of a tenant. */
+    long countByTenantIdAndTreatmentStatus(UUID tenantId, TreatmentStatus status);
 }

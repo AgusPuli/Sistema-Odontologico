@@ -68,4 +68,23 @@ public class EstimateController {
     ) {
         return ResponseEntity.ok(ApiResponse.success(service.changeStatus(id, status), "Status changed"));
     }
+
+    @org.springframework.web.bind.annotation.PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('SUPERADMIN','ADMIN','MANAGER')")
+    @Operation(summary = "Update estimate (replaces items, resets total)")
+    public ResponseEntity<ApiResponse<EstimateResponse>> update(
+            @PathVariable UUID id,
+            @jakarta.validation.Valid @org.springframework.web.bind.annotation.RequestBody
+            com.bs.odontograma.treatment.dto.request.CreateEstimateRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(service.update(id, request), "Estimate updated"));
+    }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('SUPERADMIN','ADMIN')")
+    @Operation(summary = "Delete estimate (only DRAFT/SENT/REJECTED/EXPIRED/CANCELLED)")
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
+        service.delete(id);
+        return ResponseEntity.ok(ApiResponse.success(null, "Estimate deleted"));
+    }
 }
