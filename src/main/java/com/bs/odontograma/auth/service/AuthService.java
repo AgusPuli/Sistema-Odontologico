@@ -3,6 +3,7 @@ package com.bs.odontograma.auth.service;
 import com.bs.odontograma.auth.dto.AuthResponse;
 import com.bs.odontograma.auth.dto.BootstrapRequest;
 import com.bs.odontograma.auth.dto.UserResponse;
+import com.bs.odontograma.tenant.dto.RegisterTenantRequest;
 import com.bs.odontograma.auth.entity.User;
 import com.bs.odontograma.auth.entity.UserRole;
 import com.bs.odontograma.auth.mapper.UserMapper;
@@ -189,6 +190,72 @@ public class AuthService {
         log.info("Bootstrap done. Tenant {}, user {}", tenant.getId(), admin.getId());
 
         // Issue tokens immediately so the front can navigate straight to the dashboard
+        String accessToken = tokenProvider.generateAccessToken(
+                admin.getId(), admin.getTenantId(), admin.getEmail(), admin.getRole()
+        );
+        String refreshToken = tokenProvider.generateRefreshToken(admin.getId());
+
+        return AuthResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .tokenType("Bearer")
+                .expiresIn(86400000L)
+                .user(userMapper.toResponse(admin))
+                .build();
+    }
+
+    /**
+     * Self-service tenant registration (no auth required).
+     * Creates a new Tenant + the first ADMIN user for that tenant atomically,
+     * then returns JWT tokens so the caller can navigate straight to the dashboard.
+     */
+    public AuthResponse registerTenant(RegisterTenantRequest request) {
+        log.info("Self-service tenant registration: clinic='{}', email='{}'",
+                request.getClinicName(), request.getAdminEmail());
+
+        // Guard: email must be unique across ALL users
+        if (userRepository.existsByEmail(request.getAdminEmail())) {
+            throw new BusinessRuleViolationException(
+                    "A user with email " + request.getAdminEmail() + " already exists"
+            );
+        }
+
+        // Guard: taxId must be unique if supplied
+        if (request.getTaxId() != null && !request.getTaxId().isBlank()
+                && tenantRepository.existsByTaxId(request.getTaxId())) {
+            throw new BusinessRuleViolationException(
+                    "A tenant with tax ID " + request.getTaxId() + " already exists"
+            );
+        }
+
+        // Create the tenant
+        Tenant tenant = Tenant.builder()
+                .name(request.getClinicName().trim())
+                .email(request.getAdminEmail().toLowerCase().trim())
+                .taxId(request.getTaxId())
+                .phone(request.getPhone())
+                .subscriptionPlan(request.getPlan())
+                .maxUsers(request.getPlan().getMaxUsers())
+                .active(true)
+                .planExpiration(LocalDateTime.now().plusYears(1))
+                .build();
+        tenant = tenantRepository.save(tenant);
+
+        // Create the first ADMIN for this tenant
+        User admin = User.builder()
+                .email(request.getAdminEmail().toLowerCase().trim())
+                .passwordHash(passwordEncoder.encode(request.getAdminPassword()))
+                .firstName(request.getAdminFirstName().trim())
+                .lastName(request.getAdminLastName().trim())
+                .role(UserRole.ADMIN)
+                .active(true)
+                .build();
+        admin.setTenantId(tenant.getId());
+        admin = userRepository.save(admin);
+
+        log.info("Tenant registration complete. Tenant={}, user={}", tenant.getId(), admin.getId());
+
+        // Issue tokens immediately
         String accessToken = tokenProvider.generateAccessToken(
                 admin.getId(), admin.getTenantId(), admin.getEmail(), admin.getRole()
         );

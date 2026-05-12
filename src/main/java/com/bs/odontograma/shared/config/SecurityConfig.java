@@ -47,7 +47,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/auth/login",
                                 "/api/auth/refresh",
-                                "/api/auth/bootstrap"
+                                "/api/auth/bootstrap",
+                                "/api/tenants/register"
                         ).permitAll()
                         // Public infrastructure endpoints
                         .requestMatchers(

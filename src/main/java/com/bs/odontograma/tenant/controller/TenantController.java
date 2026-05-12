@@ -1,8 +1,11 @@
 package com.bs.odontograma.tenant.controller;
 
+import com.bs.odontograma.auth.dto.AuthResponse;
+import com.bs.odontograma.auth.service.AuthService;
 import com.bs.odontograma.shared.dto.ApiResponse;
 import com.bs.odontograma.shared.security.UserPrincipal;
 import com.bs.odontograma.tenant.dto.CreateTenantRequest;
+import com.bs.odontograma.tenant.dto.RegisterTenantRequest;
 import com.bs.odontograma.tenant.dto.TenantResponse;
 import com.bs.odontograma.tenant.dto.UpdateTenantRequest;
 import com.bs.odontograma.tenant.service.TenantService;
@@ -30,6 +33,26 @@ import java.util.UUID;
 public class TenantController {
 
     private final TenantService service;
+    private final AuthService authService;
+
+    /**
+     * Public self-service registration.
+     * Creates a new tenant + its first ADMIN user in one atomic call and returns JWT tokens.
+     * No authentication required — this is the SaaS onboarding entry point.
+     */
+    @PostMapping("/register")
+    @Operation(
+            summary = "Register new tenant",
+            description = "Self-service onboarding: creates a new tenant and its first ADMIN user, returns JWT tokens. No auth required."
+    )
+    public ResponseEntity<ApiResponse<AuthResponse>> register(
+            @Valid @RequestBody RegisterTenantRequest request
+    ) {
+        log.info("Tenant self-registration: clinic='{}'", request.getClinicName());
+        AuthResponse response = authService.registerTenant(request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(response, "Tenant registered successfully"));
+    }
 
     @PostMapping
     @PreAuthorize("hasRole('SUPERADMIN')")
