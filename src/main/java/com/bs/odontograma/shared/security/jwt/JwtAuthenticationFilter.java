@@ -49,7 +49,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 UUID tenantId = tokenProvider.getTenantIdFromToken(jwt);
                 UserRole role = tokenProvider.getRoleFromToken(jwt);
 
-                tenantContext.setCurrentTenantId(tenantId);
+                if (tenantId != null) {
+                    tenantContext.setCurrentTenantId(tenantId);
+                }
 
                 List<SimpleGrantedAuthority> authorities = List.of(
                         new SimpleGrantedAuthority("ROLE_" + role.name())
