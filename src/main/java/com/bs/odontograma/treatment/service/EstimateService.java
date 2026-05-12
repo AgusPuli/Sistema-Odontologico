@@ -52,6 +52,7 @@ public class EstimateService {
                 .status(EstimateStatus.DRAFT)
                 .total(BigDecimal.ZERO)
                 .build();
+        estimate.setTenantId(tenantId);
 
         for (EstimateItemRequest itemReq : request.getItems()) {
             Treatment t = treatmentRepository.findByIdAndTenantId(itemReq.getTreatmentId(), tenantId)

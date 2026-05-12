@@ -46,6 +46,7 @@ public class TreatmentService {
                 .description(request.getDescription())
                 .active(true)
                 .build();
+        t.setTenantId(tenantId);
         return mapper.toResponse(repository.save(t));
     }
 
@@ -115,6 +116,7 @@ public class TreatmentService {
                     .description(item.description())
                     .active(true)
                     .build();
+            t.setTenantId(tenantId);
             repository.save(t);
             created++;
         }

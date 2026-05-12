@@ -1,13 +1,17 @@
 package com.bs.odontograma.shared.security;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
 
 /**
  * Context that stores the current tenant in a ThreadLocal.
- * Provides thread-safe access to the tenant ID throughout the application.
+ * Resolution order:
+ *   1. ThreadLocal (populated by JwtAuthenticationFilter from JWT claim)
+ *   2. SecurityContextHolder → UserPrincipal.tenantId (fallback when ThreadLocal is empty)
  */
 @Component
 @Slf4j
@@ -25,10 +29,33 @@ public class TenantContext {
 
     /**
      * Retrieves the current tenant for the active thread.
-     * @return UUID of the tenant, or null if not set
+     * Falls back to the authenticated principal when the ThreadLocal is empty
+     * (e.g. when the JWT did not carry a tenantId claim or the filter did not run).
+     *
+     * @return UUID of the tenant, or null if not resolvable
      */
     public UUID getCurrentTenantId() {
-        return CURRENT_TENANT.get();
+        UUID fromThread = CURRENT_TENANT.get();
+        if (fromThread != null) {
+            return fromThread;
+        }
+
+        // Fallback: read from the authenticated principal
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getPrincipal() instanceof UserPrincipal principal) {
+                UUID fromPrincipal = principal.getTenantId();
+                if (fromPrincipal != null) {
+                    log.debug("Resolved tenant {} from SecurityContextHolder (fallback)", fromPrincipal);
+                    CURRENT_TENANT.set(fromPrincipal); // cache for subsequent calls on this thread
+                    return fromPrincipal;
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Could not resolve tenant from SecurityContextHolder: {}", e.getMessage());
+        }
+
+        return null;
     }
 
     /**

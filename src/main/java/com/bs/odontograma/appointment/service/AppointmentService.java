@@ -60,6 +60,7 @@ public class AppointmentService {
                 .notes(request.getNotes())
                 .status(AppointmentStatus.SCHEDULED)
                 .build();
+        appointment.setTenantId(tenantId);
 
         return mapper.toResponse(repository.save(appointment));
     }

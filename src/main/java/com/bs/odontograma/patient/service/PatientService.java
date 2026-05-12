@@ -54,6 +54,7 @@ public class PatientService {
                 .allergies(request.getAllergies())
                 .active(true)
                 .build();
+        patient.setTenantId(tenantId);
 
         patient = repository.save(patient);
         return mapper.toResponse(patient);

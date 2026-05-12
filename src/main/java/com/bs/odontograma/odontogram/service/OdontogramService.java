@@ -98,6 +98,7 @@ public class OdontogramService {
                 .generalNotes(request.getGeneralNotes())
                 .current(true)
                 .build();
+        odontogram.setTenantId(tenantId);
         odontogram = repository.save(odontogram);
 
         // Seed all teeth as HEALTHY so the frontend has the full grid from the start
