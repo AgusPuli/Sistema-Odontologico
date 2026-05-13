@@ -20,6 +20,8 @@ com.bs.odontograma
 ├── auth/            → User + JWT + login/register
 ├── tenant/          → Tenant entity + self-registration
 ├── patient/         → Patients
+├── medicalhistory/  → Anamnesis estructurada (1:1 con Patient)
+├── clinicalsession/ → Evolución por turno (SOAP + procedimientos realizados)
 ├── treatment/       → Treatment catalog + Estimate + EstimateItem
 ├── appointment/     → Appointments
 ├── odontogram/      → Odontogram + ToothRecord + ToothSurfaceCondition + ToothHistoryEntry
